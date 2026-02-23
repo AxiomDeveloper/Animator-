@@ -11,7 +11,7 @@
         #video-container { position: relative; width: 100vw; height: 56.25vw; max-height: 100vh; max-width: 177.77vh; margin: auto; background: #000; overflow: hidden; box-shadow: 0 0 50px rgba(0,0,0,0.8); }
         #globeViz { width: 100%; height: 100%; }
 
-        /* Universal Master Panel - Now Scrollable for Mobile */
+        /* Universal Master Panel */
         #ui-panel {
             position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%);
             background: rgba(15, 15, 15, 0.95); padding: 15px; border-radius: 16px;
@@ -21,7 +21,6 @@
             border: 1px solid rgba(255,255,255,0.1); transition: opacity 0.4s ease; z-index: 20; 
             box-shadow: 0 -10px 40px rgba(0,0,0,0.8);
         }
-        /* Scrollbar hiding for clean UI */
         #ui-panel::-webkit-scrollbar { display: none; }
         
         .row { display: flex; gap: 8px; }
@@ -30,7 +29,6 @@
         input, select { background: #000; border: 1px solid #333; color: white; padding: 8px; border-radius: 6px; font-size: 13px; width: 100%; box-sizing: border-box; }
         button { border: none; padding: 12px; border-radius: 8px; font-size: 15px; font-weight: 900; cursor: pointer; margin-top: 5px; transition: background 0.2s;}
         
-        /* Toggle Switch Styling */
         .toggle-row { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.5); padding: 8px 12px; border-radius: 6px; border: 1px solid #333; }
         .toggle-row label { margin: 0; font-size: 11px; color: #ccc;}
         input[type="checkbox"] { width: 18px; height: 18px; accent-color: #ff3b30; }
@@ -87,12 +85,22 @@
         <div class="input-group"><label>Lng</label><input type="number" id="endLng" value="72.4149" step="any"></div>
     </div>
 
-    <div class="input-group" style="margin-top: 5px;">
-        <label>Export Engine</label>
-        <select id="qualitySelector">
-            <option value="1080">1080p CFR (Max Quality)</option>
-            <option value="720">720p CFR (Fast Render)</option>
-        </select>
+    <div class="row" style="margin-top: 5px;">
+        <div class="input-group">
+            <label>Flight Pacing</label>
+            <select id="speedSelector">
+                <option value="0.8">Fast (TikTok / Shorts)</option>
+                <option value="1.5" selected>Cinematic (News Standard)</option>
+                <option value="2.5">Documentary (Slow & Deep)</option>
+            </select>
+        </div>
+        <div class="input-group">
+            <label>Export Engine</label>
+            <select id="qualitySelector">
+                <option value="1080">1080p CFR (Max)</option>
+                <option value="720">720p CFR (Fast)</option>
+            </select>
+        </div>
     </div>
 
     <button id="recordBtn" onclick="recordAndFly()">RENDER UNIVERSAL MP4</button>
@@ -114,7 +122,6 @@
 
     const world = Globe()(elem).bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png').pointOfView({ lat: 32.4279, lng: 53.6880, altitude: 0.8 });
 
-    // Pre-fetch Global Border Data
     fetch('https://raw.githubusercontent.com/vasturiano/globe.gl/master/example/datasets/ne_110m_admin_0_countries.geojson')
         .then(res => res.json()).then(data => { geoJsonData = data.features; applyTheme(); });
 
@@ -122,7 +129,7 @@
     const TARGET_FPS = 30;
 
     function resizeMap() { 
-        if(isRecording) return; // Prevent WebCodecs crash if phone is rotated during render
+        if(isRecording) return; 
         world.width(container.clientWidth); world.height(container.clientHeight); 
     }
     window.addEventListener('resize', resizeMap); 
@@ -137,21 +144,14 @@
 
         world.globeImageUrl(t.globeImg);
         
-        // Handle Backgrounds (Space vs Chroma Key)
         if (bgType === 'chroma') {
-            world.backgroundImageUrl(null);
-            world.backgroundColor('#00FF00'); // Pure Green Screen
+            world.backgroundImageUrl(null); world.backgroundColor('#00FF00');
         } else {
-            world.backgroundColor('#000000');
-            world.backgroundImageUrl('https://unpkg.com/three-globe/example/img/night-sky.png');
+            world.backgroundColor('#000000'); world.backgroundImageUrl('https://unpkg.com/three-globe/example/img/night-sky.png');
         }
 
-        // Handle Geopolitical Borders
         if (showBorders && geoJsonData) {
-            world.polygonsData(geoJsonData)
-                .polygonCapColor(() => 'rgba(0,0,0,0)')
-                .polygonSideColor(() => 'rgba(0,0,0,0)')
-                .polygonStrokeColor(() => t.borderColor);
+            world.polygonsData(geoJsonData).polygonCapColor(() => 'rgba(0,0,0,0)').polygonSideColor(() => 'rgba(0,0,0,0)').polygonStrokeColor(() => t.borderColor);
         } else {
             world.polygonsData([]);
         }
@@ -168,6 +168,8 @@
         world.pointsData([{ lat: sLat, lng: sLng }, { lat: eLat, lng: eLng }]).pointColor(() => t.accentColor).pointAltitude(0.01).pointRadius(0.3);
         world.labelsData([{ lat: sLat, lng: sLng + 1.5, text: sLabel }, { lat: eLat, lng: eLng + 1.5, text: eLabel }]).labelLat('lat').labelLng('lng').labelText('text').labelSize(0.8).labelDotRadius(0).labelColor(() => t.textColor).labelResolution(8).labelAltitude(0.01);
     }
+
+    applyTheme();
 
     async function startRecording() {
         const glCanvas = elem.querySelector('canvas');
@@ -232,6 +234,9 @@
         const sLat = parseFloat(document.getElementById('startLat').value); const sLng = parseFloat(document.getElementById('startLng').value);
         const eLat = parseFloat(document.getElementById('endLat').value); const eLng = parseFloat(document.getElementById('endLng').value);
         const t = themes[activeTheme];
+        
+        // Grab the user's selected speed multiplier
+        const speedMultiplier = parseFloat(document.getElementById('speedSelector').value);
 
         document.getElementById('ui-panel').style.opacity = '0'; document.getElementById('ui-panel').style.pointerEvents = 'none'; document.getElementById('tap-to-restore').style.display = 'block';
 
@@ -241,11 +246,11 @@
         setTimeout(() => {
             startRecording();
 
-            // Draw solid arc path
             world.arcsData([{ startLat: sLat, startLng: sLng, endLat: eLat, endLng: eLng, color: [t.accentColor, t.accentColor] }]).arcColor('color').arcStroke(1.5); 
 
-            const phase1Time = 2500 * t.camSpeed;
-            const phase2Time = 3000 * t.camSpeed;
+            // Calculate the new, slower flight times
+            const phase1Time = 3000 * t.camSpeed * speedMultiplier;
+            const phase2Time = 4000 * t.camSpeed * speedMultiplier;
 
             setTimeout(() => {
                 const midLat = (sLat + eLat) / 2; const midLng = (sLng + eLng) / 2;
@@ -253,6 +258,8 @@
                 
                 setTimeout(() => {
                     world.pointOfView({ lat: eLat, lng: eLng, altitude: 0.3 }, phase2Time); 
+                    
+                    // Keep the 3 second dead-stop hold at the end so you have video padding
                     setTimeout(() => stopRecording(), phase2Time + 3000); 
                 }, phase1Time);
             }, 800);
