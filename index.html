@@ -15,9 +15,9 @@
         #video-container {
             position: relative;
             width: 100vw;
-            height: 56.25vw; /* 16:9 ratio */
+            height: 56.25vw; 
             max-height: 100vh;
-            max-width: 177.77vh; /* 16:9 ratio bounds */
+            max-width: 177.77vh; 
             margin: auto;
             background: #000;
             overflow: hidden;
@@ -26,43 +26,50 @@
 
         #globeViz { width: 100%; height: 100%; }
         
-        /* Upgraded Broadcast Labels with CSS Animations */
+        /* High-Visibility Yellow & Black Labels */
         .broadcast-label {
-            background: linear-gradient(90deg, rgba(15,15,20,0.95) 0%, rgba(30,30,40,0.85) 100%);
-            border-left: 4px solid #ff3b30;
-            color: white;
-            padding: 10px 18px;
+            background: #FFD700; /* Bright Warning Yellow */
+            border-left: 5px solid #000;
+            color: #000;
+            padding: 10px 16px;
             border-radius: 4px;
-            font-size: 15px;
-            font-weight: 700;
+            font-size: 16px;
+            font-weight: 900;
             text-transform: uppercase;
             letter-spacing: 1px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.9);
             pointer-events: none;
             display: flex;
             align-items: center;
             gap: 10px;
             white-space: nowrap;
-            /* Animation properties */
+            
+            /* Animation */
             opacity: 0;
             transform: translate(-50%, -100%) scale(0.9);
             animation: slideUpFade 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
 
-        /* The glowing recording dot next to the text */
+        /* Black pulsing dot next to text */
         .broadcast-label::before {
             content: '';
             display: block;
             width: 8px;
             height: 8px;
-            background: #ff3b30;
+            background: #000;
             border-radius: 50%;
-            box-shadow: 0 0 10px #ff3b30;
-            animation: pulse 1.5s infinite;
+            box-shadow: 0 0 5px rgba(0,0,0,0.4);
+            animation: pulse-black 1.5s infinite;
         }
 
         @keyframes slideUpFade {
             to { opacity: 1; transform: translate(-50%, -150%) scale(1); }
+        }
+        
+        @keyframes pulse-black { 
+            0% { opacity: 1; transform: scale(1); } 
+            50% { opacity: 0.5; transform: scale(1.2); } 
+            100% { opacity: 1; transform: scale(1); } 
         }
 
         /* Mobile UI Panel */
@@ -82,8 +89,8 @@
             padding: 8px; border-radius: 6px; font-size: 13px; width: 100%; box-sizing: border-box;
         }
         button { 
-            background: #ff3b30; color: white; border: none; padding: 12px; 
-            border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; margin-top: 5px;
+            background: #FFD700; color: #000; border: none; padding: 12px; 
+            border-radius: 8px; font-size: 15px; font-weight: 900; cursor: pointer; margin-top: 5px;
         }
         
         #tap-to-restore { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; display: none; }
@@ -93,8 +100,8 @@
             font-size: 14px; display: none; align-items: center; gap: 6px; z-index: 30;
             background: rgba(0,0,0,0.6); padding: 6px 12px; border-radius: 20px;
         }
-        .red-dot { width: 10px; height: 10px; background: #ff3b30; border-radius: 50%; animation: pulse 1s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+        .red-dot { width: 10px; height: 10px; background: #ff3b30; border-radius: 50%; animation: pulse-red 1s infinite; }
+        @keyframes pulse-red { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
@@ -116,20 +123,20 @@
         <div class="input-group"><label>Lat</label><input type="number" id="endLat" value="-7.3195"></div>
         <div class="input-group"><label>Lng</label><input type="number" id="endLng" value="72.4149"></div>
     </div>
-    <button onclick="recordAndFly()">🔴 Record 16:9 MP4 & Fly</button>
+    <button onclick="recordAndFly()">🔴 Record MP4 & Fly</button>
 </div>
 
 <script>
     const container = document.getElementById('video-container');
     const elem = document.getElementById('globeViz');
     
+    // Using the highest res single texture available in this library
     const world = Globe()(elem)
         .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg')
         .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
         .backgroundImageUrl('https://unpkg.com/three-globe/example/img/night-sky.png')
-        .pointOfView({ lat: 32.4279, lng: 53.6880, altitude: 2.5 });
+        .pointOfView({ lat: 32.4279, lng: 53.6880, altitude: 0.8 }); // Starting closer
 
-    // Handle Frame Expansion and Device Rotation perfectly
     function resizeMap() {
         world.width(container.clientWidth);
         world.height(container.clientHeight);
@@ -142,13 +149,15 @@
     let recordedChunks = [];
 
     function updateMapData(sLat, sLng, sLabel, eLat, eLng, eLabel) {
+        // High visibility yellow dots
         world.pointsData([ { lat: sLat, lng: sLng }, { lat: eLat, lng: eLng } ])
-        .pointColor(() => '#ff3b30').pointAltitude(0.02).pointRadius(0.3);
+        .pointColor(() => '#FFD700').pointAltitude(0.01).pointRadius(0.15);
 
         world.htmlElementsData([
-            { lat: sLat, lng: sLng, name: sLabel },
-            { lat: eLat, lng: eLng, name: eLabel }
+            { lat: sLat, lng: sLng, name: sLabel, alt: 0.06 }, // Altitude added to prevent label glitching into planet
+            { lat: eLat, lng: eLng, name: eLabel, alt: 0.06 }
         ])
+        .htmlAltitude(d => d.alt) // Forces HTML labels to float above the surface
         .htmlElement(d => {
             const el = document.createElement('div');
             el.innerHTML = d.name;
@@ -163,23 +172,20 @@
         const canvas = elem.querySelector('canvas');
         const stream = canvas.captureStream(60); 
         
-        // Smart MimeType Detection for iOS Camera Roll Compatibility
         let selectedMimeType = 'video/mp4'; 
         if (!MediaRecorder.isTypeSupported('video/mp4')) {
-            selectedMimeType = 'video/webm; codecs=vp9'; // Desktop Fallback
+            selectedMimeType = 'video/webm; codecs=vp9'; 
         }
 
         mediaRecorder = new MediaRecorder(stream, { mimeType: selectedMimeType, videoBitsPerSecond: 8000000 });
         mediaRecorder.ondataavailable = (event) => { if (event.data.size > 0) recordedChunks.push(event.data); };
         
         mediaRecorder.onstop = () => {
-            // Download as .mp4
             const blob = new Blob(recordedChunks, { type: selectedMimeType });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.style.display = 'none';
             a.href = url;
-            // Name it .mp4 so iOS recognizes it as a video file
             a.download = 'Map_Animation_16x9.mp4'; 
             document.body.appendChild(a);
             a.click();
@@ -206,26 +212,33 @@
         document.getElementById('ui-panel').style.pointerEvents = 'none';
         document.getElementById('tap-to-restore').style.display = 'block';
 
-        world.pointOfView({ lat: sLat, lng: sLng, altitude: 2.0 }, 0);
+        // 1. Start much closer to the ground (altitude 0.4)
+        world.pointOfView({ lat: sLat, lng: sLng, altitude: 0.4 }, 0);
         updateMapData(sLat, sLng, sLabel, eLat, eLng, eLabel);
         
         setTimeout(() => {
             startRecording();
 
+            // Draw solid yellow glowing path
             world.arcsData([{
                 startLat: sLat, startLng: sLng, endLat: eLat, endLng: eLng,
-                color: ['rgba(255, 59, 48, 0.1)', '#ff3b30']
+                color: ['rgba(255, 215, 0, 0.1)', '#FFD700']
             }])
-            .arcColor('color').arcDashLength(0.6).arcDashGap(0.2).arcDashAnimateTime(2000).arcStroke(1.2);
+            .arcColor('color').arcDashLength(0.6).arcDashGap(0.2).arcDashAnimateTime(2000).arcStroke(1.5);
 
             setTimeout(() => {
                 const midLat = (sLat + eLat) / 2;
                 const midLng = (sLng + eLng) / 2;
-                world.pointOfView({ lat: midLat, lng: midLng, altitude: 3.0 }, 2500); 
+                
+                // 2. Pan up to see the path, but stay relatively low (altitude 1.6)
+                world.pointOfView({ lat: midLat, lng: midLng, altitude: 1.6 }, 2500); 
                 
                 setTimeout(() => {
-                    world.pointOfView({ lat: eLat, lng: eLng, altitude: 1.5 }, 2500); 
-                    setTimeout(() => mediaRecorder.stop(), 4000); 
+                    // 3. Dive bomb close to the final destination (altitude 0.3)
+                    world.pointOfView({ lat: eLat, lng: eLng, altitude: 0.3 }, 3000); 
+                    
+                    // Stop recording a little bit after it lands
+                    setTimeout(() => mediaRecorder.stop(), 4500); 
                 }, 2500);
             }, 800);
         }, 500);
