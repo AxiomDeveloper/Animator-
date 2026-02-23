@@ -3,23 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pro Broadcast Map Renderer</title>
+    <title>CFR Broadcast Map Engine</title>
     <script src="https://unpkg.com/globe.gl"></script>
+    <script src="https://unpkg.com/mp4-muxer/build/mp4-muxer.js"></script>
     <style>
-        body { 
-            margin: 0; padding: 0; background: #050505; font-family: -apple-system, sans-serif; 
-            overflow: hidden; display: flex; align-items: center; justify-content: center; height: 100vh;
-        }
-        
-        #video-container {
-            position: relative; width: 100vw; height: 56.25vw; max-height: 100vh;
-            max-width: 177.77vh; margin: auto; background: #000; overflow: hidden;
-            box-shadow: 0 0 50px rgba(0,0,0,0.8);
-        }
-
+        body { margin: 0; padding: 0; background: #050505; font-family: -apple-system, sans-serif; overflow: hidden; display: flex; align-items: center; justify-content: center; height: 100vh; }
+        #video-container { position: relative; width: 100vw; height: 56.25vw; max-height: 100vh; max-width: 177.77vh; margin: auto; background: #000; overflow: hidden; box-shadow: 0 0 50px rgba(0,0,0,0.8); }
         #globeViz { width: 100%; height: 100%; }
 
-        /* Mobile UI Panel */
         #ui-panel {
             position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
             background: rgba(15, 15, 15, 0.95); padding: 15px; border-radius: 16px;
@@ -31,21 +22,14 @@
         .row { display: flex; gap: 8px; }
         .input-group { display: flex; flex-direction: column; flex: 1; }
         label { font-size: 9px; color: #888; margin-bottom: 3px; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px;}
-        input, select { 
-            background: #000; border: 1px solid #333; color: white; 
-            padding: 8px; border-radius: 6px; font-size: 13px; width: 100%; box-sizing: border-box;
-        }
-        input:focus { border-color: #666; outline: none; }
+        input, select { background: #000; border: 1px solid #333; color: white; padding: 8px; border-radius: 6px; font-size: 13px; width: 100%; box-sizing: border-box; }
         button { border: none; padding: 12px; border-radius: 8px; font-size: 15px; font-weight: 900; cursor: pointer; margin-top: 5px; transition: background 0.2s;}
         
         #tap-to-restore { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; display: none; }
         
-        /* Pro Render Indicator */
         #rendering-overlay {
-            position: absolute; top: 20px; right: 20px; color: #fff; font-weight: bold;
-            font-size: 12px; display: none; align-items: center; gap: 8px; z-index: 30;
-            background: rgba(255, 59, 48, 0.9); padding: 6px 14px; border-radius: 20px; letter-spacing: 1px;
-            box-shadow: 0 4px 15px rgba(255, 59, 48, 0.4);
+            position: absolute; top: 20px; right: 20px; color: #fff; font-weight: bold; font-size: 12px; display: none; align-items: center; gap: 8px; z-index: 30;
+            background: rgba(255, 59, 48, 0.9); padding: 6px 14px; border-radius: 20px; letter-spacing: 1px; box-shadow: 0 4px 15px rgba(255, 59, 48, 0.4);
         }
         .spinner { width: 12px; height: 12px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
@@ -55,7 +39,7 @@
 
 <div id="video-container">
     <div id="globeViz"></div>
-    <div id="rendering-overlay"><div class="spinner"></div> RENDERING</div>
+    <div id="rendering-overlay"><div class="spinner"></div> ENCODING CFR MP4</div>
     <div id="tap-to-restore" onclick="restoreUI()"></div>
 </div>
 
@@ -69,10 +53,10 @@
             </select>
         </div>
         <div class="input-group">
-            <label>Output Quality</label>
+            <label>Engine Target</label>
             <select id="qualitySelector">
-                <option value="1080">1080p HD (Broadcast)</option>
-                <option value="720">720p (Max Smoothness)</option>
+                <option value="1080">1080p CFR (Broadcast)</option>
+                <option value="720">720p CFR (Performance)</option>
             </select>
         </div>
     </div>
@@ -86,202 +70,173 @@
         <div class="input-group"><label>Lat</label><input type="number" id="endLat" value="-7.3195" step="any"></div>
         <div class="input-group"><label>Lng</label><input type="number" id="endLng" value="72.4149" step="any"></div>
     </div>
-    <button id="recordBtn" onclick="recordAndFly()">RENDER MP4 VIDEO</button>
+    <button id="recordBtn" onclick="recordAndFly()">RENDER CFR VIDEO</button>
 </div>
 
 <script>
+    if (typeof VideoEncoder === 'undefined') {
+        alert("Your device doesn't support the Pro WebCodecs Engine. Please update iOS.");
+    }
+
     const container = document.getElementById('video-container');
     const elem = document.getElementById('globeViz');
     
-    // Theme Engine
     const themes = {
-        broadcast: {
-            globeImg: 'https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg',
-            bgImg: 'https://unpkg.com/three-globe/example/img/night-sky.png',
-            accentColor: '#FFD700', textColor: '#FFFFFF', camSpeedMultiplier: 1.0, 
-            btnColor: '#FFD700', btnText: '#000'
-        },
-        tactical: {
-            globeImg: 'https://unpkg.com/three-globe/example/img/earth-dark.jpg',
-            bgImg: null, 
-            accentColor: '#FF3B30', textColor: '#FFFFFF', camSpeedMultiplier: 0.8, 
-            btnColor: '#FF3B30', btnText: '#FFF'
-        }
+        broadcast: { globeImg: 'https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg', bgImg: 'https://unpkg.com/three-globe/example/img/night-sky.png', accentColor: '#FFD700', textColor: '#FFFFFF', camSpeedMultiplier: 1.0, btnColor: '#FFD700', btnText: '#000' },
+        tactical: { globeImg: 'https://unpkg.com/three-globe/example/img/earth-dark.jpg', bgImg: null, accentColor: '#FF3B30', textColor: '#FFFFFF', camSpeedMultiplier: 0.8, btnColor: '#FF3B30', btnText: '#FFF' }
     };
 
     let activeTheme = 'broadcast';
+    const world = Globe()(elem).bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png').pointOfView({ lat: 32.4279, lng: 53.6880, altitude: 0.8 });
 
-    const world = Globe()(elem)
-        .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
-        .pointOfView({ lat: 32.4279, lng: 53.6880, altitude: 0.8 });
+    function resizeMap() { world.width(container.clientWidth); world.height(container.clientHeight); }
+    window.addEventListener('resize', resizeMap); window.addEventListener('orientationchange', () => setTimeout(resizeMap, 200)); setTimeout(resizeMap, 100);
 
-    function resizeMap() {
-        world.width(container.clientWidth);
-        world.height(container.clientHeight);
-    }
-    window.addEventListener('resize', resizeMap);
-    window.addEventListener('orientationchange', () => setTimeout(resizeMap, 200));
-    setTimeout(resizeMap, 100);
-
-    let mediaRecorder;
-    let recordedChunks = [];
+    let muxer, videoEncoder;
+    let frameCount = 0;
     let isRecording = false;
+    let lastCaptureTime = 0;
+    const TARGET_FPS = 30;
 
     function applyTheme() {
         activeTheme = document.getElementById('themeSelector').value;
         const t = themes[activeTheme];
-
         world.globeImageUrl(t.globeImg);
-        
-        if (t.bgImg) {
-            world.backgroundImageUrl(t.bgImg);
-        } else {
-            world.backgroundImageUrl('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='); 
-        }
-
-        const btn = document.getElementById('recordBtn');
-        btn.style.background = t.btnColor;
-        btn.style.color = t.btnText;
-
+        if (t.bgImg) world.backgroundImageUrl(t.bgImg); else world.backgroundImageUrl('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=');
+        const btn = document.getElementById('recordBtn'); btn.style.background = t.btnColor; btn.style.color = t.btnText;
         refreshMapData();
     }
 
     function refreshMapData() {
-        const sLat = parseFloat(document.getElementById('startLat').value);
-        const sLng = parseFloat(document.getElementById('startLng').value);
-        const sLabel = document.getElementById('startLabel').value;
-        const eLat = parseFloat(document.getElementById('endLat').value);
-        const eLng = parseFloat(document.getElementById('endLng').value);
-        const eLabel = document.getElementById('endLabel').value;
-        
+        const sLat = parseFloat(document.getElementById('startLat').value); const sLng = parseFloat(document.getElementById('startLng').value); const sLabel = document.getElementById('startLabel').value;
+        const eLat = parseFloat(document.getElementById('endLat').value); const eLng = parseFloat(document.getElementById('endLng').value); const eLabel = document.getElementById('endLabel').value;
         const t = themes[activeTheme];
 
-        // Clean Solid Dots
-        world.pointsData([
-            { lat: sLat, lng: sLng },
-            { lat: eLat, lng: eLng }
-        ])
-        .pointColor(() => t.accentColor).pointAltitude(0.01).pointRadius(0.3);
-
-        // Labels shifted perfectly to the right
-        world.labelsData([
-            { lat: sLat, lng: sLng + 1.5, text: sLabel },
-            { lat: eLat, lng: eLng + 1.5, text: eLabel }
-        ])
-        .labelLat('lat').labelLng('lng').labelText('text').labelSize(0.8) 
-        .labelDotRadius(0).labelColor(() => t.textColor).labelResolution(8).labelAltitude(0.01);
+        world.pointsData([{ lat: sLat, lng: sLng }, { lat: eLat, lng: eLng }]).pointColor(() => t.accentColor).pointAltitude(0.01).pointRadius(0.3);
+        world.labelsData([{ lat: sLat, lng: sLng + 1.5, text: sLabel }, { lat: eLat, lng: eLng + 1.5, text: eLabel }]).labelLat('lat').labelLng('lng').labelText('text').labelSize(0.8).labelDotRadius(0).labelColor(() => t.textColor).labelResolution(8).labelAltitude(0.01);
     }
 
     applyTheme();
 
-    function startRecording() {
+    async function startRecording() {
         const glCanvas = elem.querySelector('canvas');
-        
-        // --- PRO RENDER PIPELINE OPTIMIZER ---
-        // Force the video into exact broadcast standards instead of raw Retina screen resolution
         const quality = parseInt(document.getElementById('qualitySelector').value);
         const targetWidth = quality === 1080 ? 1920 : 1280;
         const targetHeight = quality === 1080 ? 1080 : 720;
-        const targetFPS = 30; // 30fps guarantees the mobile CPU won't drop frames
         
         const recordCanvas = document.createElement('canvas');
-        recordCanvas.width = targetWidth;
-        recordCanvas.height = targetHeight;
-        const ctx = recordCanvas.getContext('2d');
-        
+        recordCanvas.width = targetWidth; recordCanvas.height = targetHeight;
+        const ctx = recordCanvas.getContext('2d', { willReadFrequently: true });
+
+        // Build the rigid MP4 container
+        muxer = new Mp4Muxer.Muxer({
+            target: new Mp4Muxer.ArrayBufferTarget(),
+            video: { codec: 'avc', width: targetWidth, height: targetHeight },
+            fastStart: 'in-memory' // Organizes headers instantly so CapCut doesn't lag
+        });
+
+        // Build the hardware-accelerated encoder
+        videoEncoder = new VideoEncoder({
+            output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+            error: e => console.error("WebCodecs Error:", e)
+        });
+
+        videoEncoder.configure({
+            codec: 'avc1.42E028', // H.264 Baseline for absolute max compatibility
+            width: targetWidth, height: targetHeight,
+            bitrate: 10_000_000, // 10 Mbps Data Rate
+            framerate: TARGET_FPS
+        });
+
+        frameCount = 0;
         isRecording = true;
-        
-        // This scales the high-res 3D map cleanly into a 1080p/720p frame
-        function renderLoop() {
+        lastCaptureTime = performance.now();
+
+        function renderLoop(currentTime) {
             if (!isRecording) return;
-            ctx.drawImage(glCanvas, 0, 0, targetWidth, targetHeight);
             requestAnimationFrame(renderLoop);
+
+            // Throttle to capture exactly 30 times per second
+            if (currentTime - lastCaptureTime >= (1000 / TARGET_FPS)) {
+                lastCaptureTime = currentTime;
+                
+                // Copy WebGL to 2D
+                ctx.drawImage(glCanvas, 0, 0, targetWidth, targetHeight);
+                
+                // Apply strict CFR mathematical timestamp
+                const frame = new VideoFrame(recordCanvas, {
+                    timestamp: (frameCount * 1000000) / TARGET_FPS, 
+                    duration: 1000000 / TARGET_FPS
+                });
+                
+                // Force a keyframe every 30 frames (1 second) for smooth scrubbing in video editors
+                videoEncoder.encode(frame, { keyFrame: frameCount % TARGET_FPS === 0 });
+                frame.close(); // Prevent memory leaks
+                frameCount++;
+            }
         }
-        requestAnimationFrame(renderLoop);
-
-        const stream = recordCanvas.captureStream(targetFPS); 
-
-        let selectedMimeType = 'video/mp4'; 
-        if (MediaRecorder.isTypeSupported('video/mp4; codecs="avc1.42E01E"')) {
-            selectedMimeType = 'video/mp4; codecs="avc1.42E01E"';
-        } else if (!MediaRecorder.isTypeSupported('video/mp4')) {
-            selectedMimeType = 'video/webm; codecs=vp9'; 
-        }
-
-        // Generous 12 Mbps bitrate for artifact-free rendering
-        mediaRecorder = new MediaRecorder(stream, { mimeType: selectedMimeType, videoBitsPerSecond: 12000000 });
-        mediaRecorder.ondataavailable = (event) => { if (event.data.size > 0) recordedChunks.push(event.data); };
         
-        mediaRecorder.onstop = () => {
-            isRecording = false; 
-            
-            const blob = new Blob(recordedChunks, { type: selectedMimeType });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = url;
-            a.download = `Map_${activeTheme.toUpperCase()}_${quality}p.mp4`; 
-            document.body.appendChild(a);
-            a.click();
-            setTimeout(() => { document.body.removeChild(a); window.URL.revokeObjectURL(url); }, 100);
-            
-            recordedChunks = [];
-            document.getElementById('rendering-overlay').style.display = 'none';
-            restoreUI();
-        };
-
-        mediaRecorder.start(100); 
+        requestAnimationFrame(renderLoop);
         document.getElementById('rendering-overlay').style.display = 'flex';
     }
 
+    async function stopRecording() {
+        isRecording = false; 
+        document.getElementById('rendering-overlay').innerHTML = "SAVING MP4...";
+        
+        // Wait for WebCodecs to finish processing the final frames
+        await videoEncoder.flush();
+        muxer.finalize();
+        
+        const buffer = muxer.target.buffer;
+        const blob = new Blob([buffer], { type: 'video/mp4' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.style.display = 'none'; a.href = url;
+        const q = document.getElementById('qualitySelector').value;
+        a.download = `Map_${activeTheme.toUpperCase()}_${q}p_CFR.mp4`; 
+        document.body.appendChild(a);
+        a.click();
+        
+        setTimeout(() => { document.body.removeChild(a); window.URL.revokeObjectURL(url); }, 100);
+        document.getElementById('rendering-overlay').style.display = 'none';
+        document.getElementById('rendering-overlay').innerHTML = '<div class="spinner"></div> ENCODING CFR MP4';
+        restoreUI();
+    }
+
     function recordAndFly() {
-        const sLat = parseFloat(document.getElementById('startLat').value);
-        const sLng = parseFloat(document.getElementById('startLng').value);
-        const eLat = parseFloat(document.getElementById('endLat').value);
-        const eLng = parseFloat(document.getElementById('endLng').value);
+        const sLat = parseFloat(document.getElementById('startLat').value); const sLng = parseFloat(document.getElementById('startLng').value);
+        const eLat = parseFloat(document.getElementById('endLat').value); const eLng = parseFloat(document.getElementById('endLng').value);
         const t = themes[activeTheme];
 
-        document.getElementById('ui-panel').style.opacity = '0';
-        document.getElementById('ui-panel').style.pointerEvents = 'none';
-        document.getElementById('tap-to-restore').style.display = 'block';
+        document.getElementById('ui-panel').style.opacity = '0'; document.getElementById('ui-panel').style.pointerEvents = 'none'; document.getElementById('tap-to-restore').style.display = 'block';
 
         world.pointOfView({ lat: sLat, lng: sLng, altitude: 0.4 }, 0);
         refreshMapData();
         
-        // Wait a half second for the map to stabilize before encoding starts
         setTimeout(() => {
             startRecording();
 
-            world.arcsData([{
-                startLat: sLat, startLng: sLng, endLat: eLat, endLng: eLng,
-                color: [t.accentColor, t.accentColor]
-            }])
-            .arcColor('color')
-            .arcStroke(1.5); 
+            world.arcsData([{ startLat: sLat, startLng: sLng, endLat: eLat, endLng: eLng, color: [t.accentColor, t.accentColor] }]).arcColor('color').arcStroke(1.5); 
 
             const phase1Time = 2500 * t.camSpeedMultiplier;
             const phase2Time = 3000 * t.camSpeedMultiplier;
 
             setTimeout(() => {
-                const midLat = (sLat + eLat) / 2;
-                const midLng = (sLng + eLng) / 2;
-                
+                const midLat = (sLat + eLat) / 2; const midLng = (sLng + eLng) / 2;
                 world.pointOfView({ lat: midLat, lng: midLng, altitude: 1.6 }, phase1Time); 
                 
                 setTimeout(() => {
                     world.pointOfView({ lat: eLat, lng: eLng, altitude: 0.3 }, phase2Time); 
-                    
-                    // Dead-stop hold for 3 seconds before ending the video
-                    setTimeout(() => mediaRecorder.stop(), phase2Time + 3000); 
+                    setTimeout(() => stopRecording(), phase2Time + 3000); 
                 }, phase1Time);
             }, 800);
         }, 500);
     }
 
     function restoreUI() {
-        document.getElementById('ui-panel').style.opacity = '1';
-        document.getElementById('ui-panel').style.pointerEvents = 'auto';
-        document.getElementById('tap-to-restore').style.display = 'none';
+        document.getElementById('ui-panel').style.opacity = '1'; document.getElementById('ui-panel').style.pointerEvents = 'auto'; document.getElementById('tap-to-restore').style.display = 'none';
         world.arcsData([]); 
     }
 </script>
