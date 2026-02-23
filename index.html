@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Free Satellite Animator</title>
+    <title>Free Satellite Animator with Labels</title>
     <script src="https://unpkg.com/globe.gl"></script>
     <style>
         body { margin: 0; padding: 0; background: #000; font-family: -apple-system, sans-serif; overflow: hidden; }
@@ -12,17 +12,18 @@
         /* Mobile-Friendly iPhone Controls */
         #ui-panel {
             position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-            background: rgba(20, 20, 20, 0.7); padding: 15px; border-radius: 20px;
+            background: rgba(20, 20, 20, 0.85); padding: 15px; border-radius: 20px;
             backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
-            color: white; display: flex; flex-direction: column; gap: 12px;
+            color: white; display: flex; flex-direction: column; gap: 10px;
             width: 90%; max-width: 400px; box-sizing: border-box; border: 1px solid rgba(255,255,255,0.1);
+            transition: opacity 0.4s ease; /* Smooth fade out */
         }
         .row { display: flex; gap: 10px; }
         .input-group { display: flex; flex-direction: column; flex: 1; }
         label { font-size: 10px; color: #aaa; margin-bottom: 4px; text-transform: uppercase; font-weight: bold; letter-spacing: 1px;}
         input { 
-            background: rgba(0,0,0,0.5); border: 1px solid #555; color: white; 
-            padding: 10px; border-radius: 10px; font-size: 16px; width: 100%; box-sizing: border-box;
+            background: rgba(0,0,0,0.6); border: 1px solid #555; color: white; 
+            padding: 8px; border-radius: 8px; font-size: 14px; width: 100%; box-sizing: border-box;
         }
         button { 
             background: #ff3b30; color: white; border: none; padding: 14px; 
@@ -30,90 +31,128 @@
         }
         button:active { background: #cc2f26; }
         .header { text-align: center; font-weight: bold; margin-bottom: 2px; font-size: 14px; color: #ddd;}
+        
+        /* Invisible overlay to tap and bring UI back */
+        #tap-to-restore {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 10; display: none;
+        }
     </style>
 </head>
 <body>
 
 <div id="globeViz"></div>
+<div id="tap-to-restore" onclick="restoreUI()"></div>
 
 <div id="ui-panel">
     <div class="header">Location 1 (Start)</div>
     <div class="row">
+        <div class="input-group"><label>Label Name</label><input type="text" id="startLabel" value="Iran"></div>
+    </div>
+    <div class="row">
         <div class="input-group"><label>Latitude</label><input type="number" id="startLat" value="32.4279"></div>
         <div class="input-group"><label>Longitude</label><input type="number" id="startLng" value="53.6880"></div>
     </div>
+
     <div class="header" style="margin-top: 5px;">Location 2 (End)</div>
+    <div class="row">
+        <div class="input-group"><label>Label Name</label><input type="text" id="endLabel" value="Diego Garcia Air Base"></div>
+    </div>
     <div class="row">
         <div class="input-group"><label>Latitude</label><input type="number" id="endLat" value="-7.3195"></div>
         <div class="input-group"><label>Longitude</label><input type="number" id="endLng" value="72.4149"></div>
     </div>
+    
     <button onclick="playAnimation()">Fly & Draw Path</button>
 </div>
 
 <script>
-    // 1. Initialize the 3D Globe with Free NASA Textures
+    // Initialize Globe
     const world = Globe()
         (document.getElementById('globeViz'))
         .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg')
         .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
         .backgroundImageUrl('https://unpkg.com/three-globe/example/img/night-sky.png')
-        .pointOfView({ lat: 32.4279, lng: 53.6880, altitude: 2.5 }); // Default start view
+        .pointOfView({ lat: 32.4279, lng: 53.6880, altitude: 2.5 });
 
-    // 2. Add starting markers
-    world.pointsData([
-        { lat: 32.4279, lng: 53.6880 },
-        { lat: -7.3195, lng: 72.4149 }
-    ])
-    .pointColor(() => '#ff3b30') // Apple Red markers
-    .pointAltitude(0.02)
-    .pointRadius(0.3);
-
-    // 3. The Animation Logic
-    function playAnimation() {
-        // Grab the coordinates from the text boxes
-        const sLat = parseFloat(document.getElementById('startLat').value);
-        const sLng = parseFloat(document.getElementById('startLng').value);
-        const eLat = parseFloat(document.getElementById('endLat').value);
-        const eLng = parseFloat(document.getElementById('endLng').value);
-
-        // Snap camera back to the start
-        world.pointOfView({ lat: sLat, lng: sLng, altitude: 2.0 }, 0);
-
-        // Update the red markers
+    // Initial setup for markers and labels
+    function updateMapData(sLat, sLng, sLabel, eLat, eLng, eLabel) {
+        // Red Dots
         world.pointsData([
             { lat: sLat, lng: sLng },
             { lat: eLat, lng: eLng }
-        ]);
+        ])
+        .pointColor(() => '#ff3b30')
+        .pointAltitude(0.02)
+        .pointRadius(0.3);
 
-        // Draw the glowing arc with a "shooting star" dash animation
+        // White Text Labels floating just above the dots
+        world.labelsData([
+            { lat: sLat, lng: sLng, text: sLabel },
+            { lat: eLat, lng: eLng, text: eLabel }
+        ])
+        .labelLat(d => d.lat)
+        .labelLng(d => d.lng)
+        .labelText(d => d.text)
+        .labelSize(1.5)
+        .labelDotRadius(0) // Hidden dot so we only see the red point underneath
+        .labelColor(() => '#ffffff')
+        .labelAltitude(0.04);
+    }
+
+    // Load defaults on start
+    updateMapData(32.4279, 53.6880, "Iran", -7.3195, 72.4149, "Diego Garcia Air Base");
+
+    function playAnimation() {
+        // Grab inputs
+        const sLat = parseFloat(document.getElementById('startLat').value);
+        const sLng = parseFloat(document.getElementById('startLng').value);
+        const sLabel = document.getElementById('startLabel').value;
+        
+        const eLat = parseFloat(document.getElementById('endLat').value);
+        const eLng = parseFloat(document.getElementById('endLng').value);
+        const eLabel = document.getElementById('endLabel').value;
+
+        // Hide UI for screen recording
+        document.getElementById('ui-panel').style.opacity = '0';
+        document.getElementById('ui-panel').style.pointerEvents = 'none';
+        document.getElementById('tap-to-restore').style.display = 'block';
+
+        // Snap camera back to start
+        world.pointOfView({ lat: sLat, lng: sLng, altitude: 2.0 }, 0);
+        updateMapData(sLat, sLng, sLabel, eLat, eLng, eLabel);
+
+        // Draw animated arc
         world.arcsData([{
-            startLat: sLat,
-            startLng: sLng,
-            endLat: eLat,
-            endLng: eLng,
-            color: ['rgba(255, 59, 48, 0.1)', '#ff3b30'] // Fades from transparent to solid red
+            startLat: sLat, startLng: sLng, endLat: eLat, endLng: eLng,
+            color: ['rgba(255, 59, 48, 0.1)', '#ff3b30']
         }])
         .arcColor('color')
         .arcDashLength(0.6)
         .arcDashGap(0.2)
-        .arcDashAnimateTime(2000) // Speed of the glowing dash
+        .arcDashAnimateTime(2000)
         .arcStroke(1.2);
 
-        // Cinematic Camera Flight: Wait 1 second, then fly to destination
+        // Cinematic Camera Flight
         setTimeout(() => {
-            // Calculate a midpoint so the camera zooms out slightly to show the whole path
             const midLat = (sLat + eLat) / 2;
             const midLng = (sLng + eLng) / 2;
             
-            // Phase 1: Pan to midpoint and zoom out
+            // Pan to midpoint and zoom out
             world.pointOfView({ lat: midLat, lng: midLng, altitude: 3.0 }, 2500);
             
-            // Phase 2: Zoom in on the destination
+            // Zoom in on destination
             setTimeout(() => {
                 world.pointOfView({ lat: eLat, lng: eLng, altitude: 1.5 }, 2500);
             }, 2500);
             
         }, 800);
+    }
+
+    function restoreUI() {
+        document.getElementById('ui-panel').style.opacity = '1';
+        document.getElementById('ui-panel').style.pointerEvents = 'auto';
+        document.getElementById('tap-to-restore').style.display = 'none';
     }
 </script>
 
