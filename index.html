@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Satellite Animation Maker</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+    <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+    <style>
+        body { margin: 0; padding: 0; background: #000; font-family: -apple-system, Helvetica, sans-serif; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+        #controls {
+            position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
+            z-index: 10; background: rgba(0,0,0,0.8); padding: 15px 25px;
+            border-radius: 30px; backdrop-filter: blur(10px); display: flex; gap: 15px;
+        }
+        button {
+            background: #007AFF; color: white; border: none; padding: 12px 24px;
+            border-radius: 20px; font-size: 16px; font-weight: bold; cursor: pointer;
+        }
+        button:active { background: #0056b3; }
+        button.reset { background: #333; }
+    </style>
+</head>
+<body>
+
+<div id="map"></div>
+<div id="controls">
+    <button class="reset" onclick="resetMap()">Reset</button>
+    <button onclick="playAnimation()">Play Animation</button>
+</div>
+
+<script>
+    // TO DO: Get a free token from mapbox.com and paste it here
+    mapboxgl.accessToken = 'YOUR_MAPBOX_ACCESS_TOKEN_HERE';
+
+    // Set locations (Longitude, Latitude)
+    const origin = [53.6880, 32.4279]; // Iran (Center)
+    const destination = [72.4149, -7.3195]; // Diego Garcia
+
+    const map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/mapbox/satellite-v9', // High-res satellite
+        projection: 'globe', // 3D Globe mode for news-style look
+        zoom: 2.5,
+        center: origin,
+        pitch: 45 // Tilted camera
+    });
+
+    // Add space atmosphere
+    map.on('style.load', () => {
+        map.setFog({
+            'color': 'rgb(186, 210, 235)',
+            'high-color': 'rgb(36, 92, 223)',
+            'horizon-blend': 0.02,
+            'space-color': 'rgb(11, 11, 25)',
+            'star-intensity': 0.6
+        });
+    });
+
+    let animationFrame;
+    const steps = 300; // Number of animation frames (higher = slower/smoother)
+    let currentStep = 0;
+    let arcCoordinates = [];
+
+    map.on('load', () => {
+        // Calculate the curved arc between the two points
+        const route = turf.greatCircle(turf.point(origin), turf.point(destination));
+        const lineDistance = turf.length(route);
+        
+        for (let i = 0; i <= steps; i++) {
+            const segment = turf.along(route, (lineDistance * i) / steps);
+            arcCoordinates.push(segment.geometry.coordinates);
+        }
+
+        // Add the empty line source to the map
+        map.addSource('path', {
+            'type': 'geojson',
+            'data': { 'type': 'Feature', 'geometry': { 'type': 'LineString', 'coordinates': [] } }
+        });
+
+        // Add a glowing line style
+        map.addLayer({
+            'id': 'path-line',
+            'type': 'line',
+            'source': 'path',
+            'layout': { 'line-join': 'round', 'line-cap': 'round' },
+            'paint': {
+                'line-color': '#ff3b30', // Apple red
+                'line-width': 4,
+                'line-opacity': 0.9
+            }
+        });
+
+        // Add markers for Start and End
+        new mapboxgl.Marker({color: "#ff3b30"}).setLngLat(origin).addTo(map);
+        new mapboxgl.Marker({color: "#ff3b30"}).setLngLat(destination).addTo(map);
+    });
+
+    function playAnimation() {
+        if (currentStep >= steps) return; // Prevent double taps
+        
+        // Start moving the camera to the destination slowly
+        map.flyTo({
+            center: destination,
+            zoom: 3.5,
+            pitch: 60,
+            bearing: 20,
+            speed: 0.2, // Slow panning speed
+            curve: 1,
+            essential: true
+        });
+
+        function animateLine() {
+            if (currentStep < steps) {
+                // Get the coordinates up to the current frame
+                const currentPath = arcCoordinates.slice(0, currentStep + 1);
+                
+                // Update the map line
+                map.getSource('path').setData({
+                    'type': 'Feature',
+                    'geometry': { 'type': 'LineString', 'coordinates': currentPath }
+                });
+
+                currentStep++;
+                animationFrame = requestAnimationFrame(animateLine);
+            }
+        }
+        animateLine();
+    }
+
+    function resetMap() {
+        cancelAnimationFrame(animationFrame);
+        currentStep = 0;
+        map.getSource('path').setData({ 'type': 'Feature', 'geometry': { 'type': 'LineString', 'coordinates': [] } });
+        map.flyTo({ center: origin, zoom: 2.5, pitch: 45, bearing: 0, speed: 1.5 });
+    }
+</script>
+
+</body>
+</html>
