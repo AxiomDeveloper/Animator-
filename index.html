@@ -122,6 +122,7 @@
 
     let mediaRecorder;
     let recordedChunks = [];
+    let isRecording = false;
 
     function applyTheme() {
         activeTheme = document.getElementById('themeSelector').value;
@@ -152,65 +153,69 @@
         
         const t = themes[activeTheme];
 
-        // 1. Hovering 3D Text (Offset slightly North so it doesn't block the target)
         world.labelsData([
             { lat: sLat + 1.2, lng: sLng, text: sLabel },
             { lat: eLat + 1.2, lng: eLng, text: eLabel }
         ])
-        .labelLat('lat')
-        .labelLng('lng')
-        .labelText('text')
-        .labelSize(0.8) 
-        .labelDotRadius(0) // Hide the text dot so we only see the targeting rings
-        .labelColor(() => t.textColor)
-        .labelResolution(8) 
-        .labelAltitude(0.01);
+        .labelLat('lat').labelLng('lng').labelText('text').labelSize(0.8) 
+        .labelDotRadius(0).labelColor(() => t.textColor).labelResolution(8).labelAltitude(0.01);
 
-        // 2. Geographic Targeting Crosshairs (Guarantees exact coordinate visibility)
         const crosshairSize = 1.2;
         const crosshairs = [
-            // Start Target
             [ {lat: sLat - crosshairSize, lng: sLng}, {lat: sLat + crosshairSize, lng: sLng} ],
             [ {lat: sLat, lng: sLng - crosshairSize}, {lat: sLat, lng: sLng + crosshairSize} ],
-            // End Target
             [ {lat: eLat - crosshairSize, lng: eLng}, {lat: eLat + crosshairSize, lng: eLng} ],
             [ {lat: eLat, lng: eLng - crosshairSize}, {lat: eLat, lng: eLng + crosshairSize} ]
         ];
 
-        world.pathsData(crosshairs)
-            .pathPoints(d => d)
-            .pathPointLat(p => p.lat)
-            .pathPointLng(p => p.lng)
-            .pathColor(() => t.accentColor)
-            .pathResolution(2)
-            .pathStroke(1.5);
+        world.pathsData(crosshairs).pathPoints(d => d).pathPointLat(p => p.lat).pathPointLng(p => p.lng)
+            .pathColor(() => t.accentColor).pathResolution(2).pathStroke(1.5);
 
-        // 3. Ground Radar Rings
-        world.ringsData([
-            { lat: sLat, lng: sLng },
-            { lat: eLat, lng: eLng }
-        ])
-        .ringColor(() => t.accentColor)
-        .ringMaxRadius(1.5)
-        .ringPropagationSpeed(1.0)
-        .ringRepeatPeriod(1000);
+        world.ringsData([ { lat: sLat, lng: sLng }, { lat: eLat, lng: eLng } ])
+            .ringColor(() => t.accentColor).ringMaxRadius(1.5).ringPropagationSpeed(1.0).ringRepeatPeriod(1000);
     }
 
     applyTheme();
 
     function startRecording() {
-        const canvas = elem.querySelector('canvas');
-        const stream = canvas.captureStream(60); 
+        const glCanvas = elem.querySelector('canvas');
         
+        // --- THE FIX: 2D Mirroring to bypass Safari's WebGL freeze bug ---
+        const recordCanvas = document.createElement('canvas');
+        recordCanvas.width = glCanvas.width;
+        recordCanvas.height = glCanvas.height;
+        const ctx = recordCanvas.getContext('2d');
+        
+        isRecording = true;
+        
+        // Rapidly paint the 3D map to the invisible 2D canvas
+        function renderLoop() {
+            if (!isRecording) return;
+            ctx.drawImage(glCanvas, 0, 0);
+            requestAnimationFrame(renderLoop);
+        }
+        requestAnimationFrame(renderLoop);
+
+        // Record the 2D canvas instead
+        const stream = recordCanvas.captureStream(60); 
+        // -----------------------------------------------------------------
+
         let selectedMimeType = 'video/mp4'; 
-        if (!MediaRecorder.isTypeSupported('video/mp4')) {
+        // Explicitly request the most stable iOS H264 codec if available
+        if (MediaRecorder.isTypeSupported('video/mp4; codecs="avc1.42E01E"')) {
+            selectedMimeType = 'video/mp4; codecs="avc1.42E01E"';
+        } else if (!MediaRecorder.isTypeSupported('video/mp4')) {
             selectedMimeType = 'video/webm; codecs=vp9'; 
         }
 
         mediaRecorder = new MediaRecorder(stream, { mimeType: selectedMimeType, videoBitsPerSecond: 8000000 });
+        
+        // Force chunks every 100ms to keep Safari's encoder awake
         mediaRecorder.ondataavailable = (event) => { if (event.data.size > 0) recordedChunks.push(event.data); };
         
         mediaRecorder.onstop = () => {
+            isRecording = false; // Kill the 2D render loop
+            
             const blob = new Blob(recordedChunks, { type: selectedMimeType });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -226,7 +231,7 @@
             restoreUI();
         };
 
-        mediaRecorder.start();
+        mediaRecorder.start(100); // 100ms timeslices
         document.getElementById('recording-indicator').style.display = 'flex';
     }
 
@@ -266,7 +271,6 @@
                 setTimeout(() => {
                     world.pointOfView({ lat: eLat, lng: eLng, altitude: 0.3 }, phase2Time); 
                     
-                    // Guaranteed 3.0 second dead-stop hold before saving
                     setTimeout(() => mediaRecorder.stop(), phase2Time + 3000); 
                 }, phase1Time);
             }, 800);
