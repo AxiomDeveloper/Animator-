@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>16:9 Pro Map Video Generator</title>
+    <title>16:9 Precision Map Video Generator</title>
     <script src="https://unpkg.com/globe.gl"></script>
     <style>
         body { 
@@ -22,30 +22,31 @@
         /* Mobile UI Panel */
         #ui-panel {
             position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            background: rgba(20, 20, 20, 0.95); padding: 15px; border-radius: 16px;
+            background: rgba(15, 15, 15, 0.95); padding: 15px; border-radius: 16px;
             backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
             color: white; display: flex; flex-direction: column; gap: 8px;
-            width: 90%; max-width: 500px; box-sizing: border-box; border: 1px solid rgba(255,255,255,0.15);
+            width: 90%; max-width: 500px; box-sizing: border-box; border: 1px solid rgba(255,255,255,0.1);
             transition: opacity 0.4s ease; z-index: 20; box-shadow: 0 -10px 40px rgba(0,0,0,0.8);
         }
         .row { display: flex; gap: 8px; }
         .input-group { display: flex; flex-direction: column; flex: 1; }
-        label { font-size: 9px; color: #bbb; margin-bottom: 3px; text-transform: uppercase; font-weight: bold;}
+        label { font-size: 9px; color: #888; margin-bottom: 3px; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px;}
         input, select { 
-            background: rgba(0,0,0,0.7); border: 1px solid #444; color: white; 
+            background: #000; border: 1px solid #333; color: white; 
             padding: 8px; border-radius: 6px; font-size: 13px; width: 100%; box-sizing: border-box;
         }
-        button { border: none; padding: 12px; border-radius: 8px; font-size: 15px; font-weight: 900; cursor: pointer; margin-top: 5px; transition: background 0.3s;}
+        input:focus { border-color: #666; outline: none; }
+        button { border: none; padding: 12px; border-radius: 8px; font-size: 15px; font-weight: 900; cursor: pointer; margin-top: 5px; transition: background 0.2s;}
         
         #tap-to-restore { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; display: none; }
         
         #recording-indicator {
             position: absolute; top: 20px; right: 20px; color: #ff3b30; font-weight: bold;
             font-size: 14px; display: none; align-items: center; gap: 6px; z-index: 30;
-            background: rgba(0,0,0,0.6); padding: 6px 12px; border-radius: 20px;
+            background: rgba(0,0,0,0.8); padding: 6px 12px; border-radius: 20px; border: 1px solid #ff3b30;
         }
         .red-dot { width: 10px; height: 10px; background: #ff3b30; border-radius: 50%; animation: pulse-red 1s infinite; }
-        @keyframes pulse-red { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        @keyframes pulse-red { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
     </style>
 </head>
 <body>
@@ -68,13 +69,13 @@
     </div>
     <div class="row">
         <div class="input-group"><label>Start Label</label><input type="text" id="startLabel" value="Iran"></div>
-        <div class="input-group"><label>Lat</label><input type="number" id="startLat" value="32.4279"></div>
-        <div class="input-group"><label>Lng</label><input type="number" id="startLng" value="53.6880"></div>
+        <div class="input-group"><label>Lat</label><input type="number" id="startLat" value="32.4279" step="any"></div>
+        <div class="input-group"><label>Lng</label><input type="number" id="startLng" value="53.6880" step="any"></div>
     </div>
     <div class="row">
         <div class="input-group"><label>End Label</label><input type="text" id="endLabel" value="Diego Garcia Air Base"></div>
-        <div class="input-group"><label>Lat</label><input type="number" id="endLat" value="-7.3195"></div>
-        <div class="input-group"><label>Lng</label><input type="number" id="endLng" value="72.4149"></div>
+        <div class="input-group"><label>Lat</label><input type="number" id="endLat" value="-7.3195" step="any"></div>
+        <div class="input-group"><label>Lng</label><input type="number" id="endLng" value="72.4149" step="any"></div>
     </div>
     <button id="recordBtn" onclick="recordAndFly()">🔴 Record MP4 & Fly</button>
 </div>
@@ -83,23 +84,23 @@
     const container = document.getElementById('video-container');
     const elem = document.getElementById('globeViz');
     
-    // Upgraded Theme Engine
+    // Theme Engine
     const themes = {
         broadcast: {
             globeImg: 'https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg',
             bgImg: 'https://unpkg.com/three-globe/example/img/night-sky.png',
-            accentColor: '#FFD700', // Yellow Path & Rings
-            textColor: '#FFFFFF', // Crisp White Text
+            accentColor: '#FFD700', 
+            textColor: '#FFFFFF', 
             camSpeedMultiplier: 1.0, 
             btnColor: '#FFD700',
             btnText: '#000'
         },
         tactical: {
             globeImg: 'https://unpkg.com/three-globe/example/img/earth-dark.jpg',
-            bgImg: null, // Pitch black space background
-            accentColor: '#FF3B30', // Threat Red Path & Rings
-            textColor: '#FFFFFF', // Crisp White Text
-            camSpeedMultiplier: 0.7, // Snappy camera movement
+            bgImg: null, 
+            accentColor: '#FF3B30', 
+            textColor: '#FFFFFF', 
+            camSpeedMultiplier: 0.7, 
             btnColor: '#FF3B30',
             btnText: '#FFF'
         }
@@ -151,28 +152,47 @@
         
         const t = themes[activeTheme];
 
-        // NEW: Native 3D WebGL Text (Locks perfectly to coordinates, scales with zoom)
+        // 1. Hovering 3D Text (Offset slightly North so it doesn't block the target)
         world.labelsData([
-            { lat: sLat, lng: sLng, text: sLabel },
-            { lat: eLat, lng: eLng, text: eLabel }
+            { lat: sLat + 1.2, lng: sLng, text: sLabel },
+            { lat: eLat + 1.2, lng: eLng, text: eLabel }
         ])
         .labelLat('lat')
         .labelLng('lng')
         .labelText('text')
-        .labelSize(1.0) // Perfectly proportioned 3D size
-        .labelDotRadius(0.25)
+        .labelSize(0.8) 
+        .labelDotRadius(0) // Hide the text dot so we only see the targeting rings
         .labelColor(() => t.textColor)
-        .labelResolution(8) // High-res text rendering
+        .labelResolution(8) 
         .labelAltitude(0.01);
 
-        // NEW: 3D Radar Pulsing Rings on the ground
+        // 2. Geographic Targeting Crosshairs (Guarantees exact coordinate visibility)
+        const crosshairSize = 1.2;
+        const crosshairs = [
+            // Start Target
+            [ {lat: sLat - crosshairSize, lng: sLng}, {lat: sLat + crosshairSize, lng: sLng} ],
+            [ {lat: sLat, lng: sLng - crosshairSize}, {lat: sLat, lng: sLng + crosshairSize} ],
+            // End Target
+            [ {lat: eLat - crosshairSize, lng: eLng}, {lat: eLat + crosshairSize, lng: eLng} ],
+            [ {lat: eLat, lng: eLng - crosshairSize}, {lat: eLat, lng: eLng + crosshairSize} ]
+        ];
+
+        world.pathsData(crosshairs)
+            .pathPoints(d => d)
+            .pathPointLat(p => p.lat)
+            .pathPointLng(p => p.lng)
+            .pathColor(() => t.accentColor)
+            .pathResolution(2)
+            .pathStroke(1.5);
+
+        // 3. Ground Radar Rings
         world.ringsData([
             { lat: sLat, lng: sLng },
             { lat: eLat, lng: eLng }
         ])
         .ringColor(() => t.accentColor)
-        .ringMaxRadius(1.8)
-        .ringPropagationSpeed(1.2)
+        .ringMaxRadius(1.5)
+        .ringPropagationSpeed(1.0)
         .ringRepeatPeriod(1000);
     }
 
@@ -246,7 +266,7 @@
                 setTimeout(() => {
                     world.pointOfView({ lat: eLat, lng: eLng, altitude: 0.3 }, phase2Time); 
                     
-                    // FIXED: Wait for the camera to finish flying, then hold completely still for exactly 3 seconds
+                    // Guaranteed 3.0 second dead-stop hold before saving
                     setTimeout(() => mediaRecorder.stop(), phase2Time + 3000); 
                 }, phase1Time);
             }, 800);
