@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>16:9 Pro Map Video Generator</title>
+    <title>16:9 Multi-Style Video Generator</title>
     <script src="https://unpkg.com/globe.gl"></script>
     <style>
         body { 
@@ -18,54 +18,52 @@
 
         #globeViz { width: 100%; height: 100%; }
         
-        /* Inner Label Styling - Yellow & Black */
+        /* THEME 1: News Broadcast Labels */
         .broadcast-label {
-            background: #FFD700;
-            color: #000;
-            padding: 8px 14px;
-            border-radius: 4px;
-            font-size: 16px;
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.8);
-            pointer-events: none;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            white-space: nowrap;
-            /* Safely offset the label without breaking the map's 3D tracking */
-            margin-top: -40px;
-            transform: translateX(-50%);
+            background: #FFD700; color: #000; padding: 8px 14px; border-radius: 4px;
+            font-size: 16px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.8); pointer-events: none;
+            display: flex; align-items: center; gap: 8px; white-space: nowrap;
+            margin-top: -40px; transform: translateX(-50%);
         }
-
-        /* Black pulsing dot next to text */
         .broadcast-label::before {
             content: ''; display: block; width: 8px; height: 8px;
-            background: #000; border-radius: 50%;
-            animation: pulse-black 1.5s infinite;
+            background: #000; border-radius: 50%; animation: pulse-black 1.5s infinite;
         }
         
-        @keyframes pulse-black { 
-            0% { opacity: 1; transform: scale(1); } 
-            50% { opacity: 0.5; transform: scale(1.3); } 
-            100% { opacity: 1; transform: scale(1); } 
+        /* THEME 2: Military Tactical Labels */
+        .tactical-label {
+            background: rgba(0, 15, 0, 0.85); border: 1px solid #00FF00; color: #00FF00;
+            padding: 6px 12px; font-family: "Courier New", Courier, monospace;
+            font-size: 15px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.4); pointer-events: none;
+            display: flex; align-items: center; gap: 8px; white-space: nowrap;
+            margin-top: -40px; transform: translateX(-50%); backdrop-filter: blur(4px);
         }
+        .tactical-label::before {
+            content: '[+]'; color: #00FF00; font-size: 14px; animation: blink-green 1s infinite;
+        }
+
+        @keyframes pulse-black { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.3); } }
+        @keyframes blink-green { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 
         /* Mobile UI Panel */
         #ui-panel {
             position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            background: rgba(20, 20, 20, 0.9); padding: 15px; border-radius: 16px;
+            background: rgba(20, 20, 20, 0.95); padding: 15px; border-radius: 16px;
             backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
             color: white; display: flex; flex-direction: column; gap: 8px;
             width: 90%; max-width: 500px; box-sizing: border-box; border: 1px solid rgba(255,255,255,0.15);
-            transition: opacity 0.4s ease; z-index: 20;
+            transition: opacity 0.4s ease; z-index: 20; box-shadow: 0 -10px 40px rgba(0,0,0,0.8);
         }
         .row { display: flex; gap: 8px; }
         .input-group { display: flex; flex-direction: column; flex: 1; }
         label { font-size: 9px; color: #bbb; margin-bottom: 3px; text-transform: uppercase; font-weight: bold;}
-        input { background: rgba(0,0,0,0.7); border: 1px solid #444; color: white; padding: 8px; border-radius: 6px; font-size: 13px; width: 100%; box-sizing: border-box; }
-        button { background: #FFD700; color: #000; border: none; padding: 12px; border-radius: 8px; font-size: 15px; font-weight: 900; cursor: pointer; margin-top: 5px; }
+        input, select { 
+            background: rgba(0,0,0,0.7); border: 1px solid #444; color: white; 
+            padding: 8px; border-radius: 6px; font-size: 13px; width: 100%; box-sizing: border-box;
+        }
+        button { background: #ff3b30; color: #fff; border: none; padding: 12px; border-radius: 8px; font-size: 15px; font-weight: 900; cursor: pointer; margin-top: 5px; }
         
         #tap-to-restore { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; display: none; }
         
@@ -75,7 +73,7 @@
             background: rgba(0,0,0,0.6); padding: 6px 12px; border-radius: 20px;
         }
         .red-dot { width: 10px; height: 10px; background: #ff3b30; border-radius: 50%; animation: pulse-red 1s infinite; }
-        @keyframes pulse-red { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+        @keyframes pulse-red { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
     </style>
 </head>
 <body>
@@ -88,6 +86,15 @@
 
 <div id="ui-panel">
     <div class="row">
+        <div class="input-group">
+            <label>Visual Style</label>
+            <select id="themeSelector" onchange="applyTheme()">
+                <option value="broadcast">News Broadcast (Yellow/Blue Marble)</option>
+                <option value="tactical">Military Tactical (Green/Dark Radar)</option>
+            </select>
+        </div>
+    </div>
+    <div class="row">
         <div class="input-group"><label>Start Label</label><input type="text" id="startLabel" value="Iran"></div>
         <div class="input-group"><label>Lat</label><input type="number" id="startLat" value="32.4279"></div>
         <div class="input-group"><label>Lng</label><input type="number" id="startLng" value="53.6880"></div>
@@ -97,17 +104,39 @@
         <div class="input-group"><label>Lat</label><input type="number" id="endLat" value="-7.3195"></div>
         <div class="input-group"><label>Lng</label><input type="number" id="endLng" value="72.4149"></div>
     </div>
-    <button onclick="recordAndFly()">🔴 Record MP4 & Fly</button>
+    <button id="recordBtn" onclick="recordAndFly()">🔴 Record MP4 & Fly</button>
 </div>
 
 <script>
     const container = document.getElementById('video-container');
     const elem = document.getElementById('globeViz');
     
+    // Theme Configuration Dictionary
+    const themes = {
+        broadcast: {
+            globeImg: 'https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg',
+            bgImg: 'https://unpkg.com/three-globe/example/img/night-sky.png',
+            accentColor: '#FFD700', // Yellow
+            labelClass: 'broadcast-label',
+            camSpeedMultiplier: 1.0, // Smooth
+            btnColor: '#FFD700',
+            btnText: '#000'
+        },
+        tactical: {
+            globeImg: 'https://unpkg.com/three-globe/example/img/earth-dark.jpg',
+            bgImg: null, // Pitch black space
+            accentColor: '#00FF00', // Neon Green
+            labelClass: 'tactical-label',
+            camSpeedMultiplier: 0.6, // Snappy, 40% faster
+            btnColor: '#00FF00',
+            btnText: '#000'
+        }
+    };
+
+    let activeTheme = 'broadcast';
+
     const world = Globe()(elem)
-        .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg')
         .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
-        .backgroundImageUrl('https://unpkg.com/three-globe/example/img/night-sky.png')
         .pointOfView({ lat: 32.4279, lng: 53.6880, altitude: 0.8 });
 
     function resizeMap() {
@@ -121,10 +150,42 @@
     let mediaRecorder;
     let recordedChunks = [];
 
-    function updateMapData(sLat, sLng, sLabel, eLat, eLng, eLabel) {
-        // High visibility yellow points
+    function applyTheme() {
+        activeTheme = document.getElementById('themeSelector').value;
+        const t = themes[activeTheme];
+
+        // Swap Textures
+        world.globeImageUrl(t.globeImg);
+        
+        // Remove background image for tactical to make it pitch black
+        if (t.bgImg) {
+            world.backgroundImageUrl(t.bgImg);
+        } else {
+            // A trick to clear the background image in Globe.gl
+            world.backgroundImageUrl('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='); 
+        }
+
+        // Update Record Button styling to match theme
+        const btn = document.getElementById('recordBtn');
+        btn.style.background = t.btnColor;
+        btn.style.color = t.btnText;
+
+        // Force a map data update to instantly swap label styles and dot colors
+        refreshMapData();
+    }
+
+    function refreshMapData() {
+        const sLat = parseFloat(document.getElementById('startLat').value);
+        const sLng = parseFloat(document.getElementById('startLng').value);
+        const sLabel = document.getElementById('startLabel').value;
+        const eLat = parseFloat(document.getElementById('endLat').value);
+        const eLng = parseFloat(document.getElementById('endLng').value);
+        const eLabel = document.getElementById('endLabel').value;
+        
+        const t = themes[activeTheme];
+
         world.pointsData([ { lat: sLat, lng: sLng }, { lat: eLat, lng: eLng } ])
-        .pointColor(() => '#FFD700').pointAltitude(0.01).pointRadius(0.15);
+        .pointColor(() => t.accentColor).pointAltitude(0.01).pointRadius(0.15);
 
         world.htmlElementsData([
             { lat: sLat, lng: sLng, name: sLabel },
@@ -132,18 +193,17 @@
         ])
         .htmlAltitude(0.03) 
         .htmlElement(d => {
-            // THE FIX: We create an invisible container that the map moves...
             const container = document.createElement('div');
-            // ...and put our styled label inside it. Safari can't break this.
             const el = document.createElement('div');
             el.innerHTML = d.name;
-            el.className = 'broadcast-label';
+            el.className = t.labelClass; // Assigns the correct CSS class based on theme
             container.appendChild(el);
             return container;
         });
     }
 
-    updateMapData(32.4279, 53.6880, "Iran", -7.3195, 72.4149, "Diego Garcia Air Base");
+    // Initialize default theme
+    applyTheme();
 
     function startRecording() {
         const canvas = elem.querySelector('canvas');
@@ -163,7 +223,7 @@
             const a = document.createElement('a');
             a.style.display = 'none';
             a.href = url;
-            a.download = 'Map_Animation_16x9.mp4'; 
+            a.download = `Map_${activeTheme.toUpperCase()}_16x9.mp4`; 
             document.body.appendChild(a);
             a.click();
             setTimeout(() => { document.body.removeChild(a); window.URL.revokeObjectURL(url); }, 100);
@@ -180,39 +240,44 @@
     function recordAndFly() {
         const sLat = parseFloat(document.getElementById('startLat').value);
         const sLng = parseFloat(document.getElementById('startLng').value);
-        const sLabel = document.getElementById('startLabel').value;
         const eLat = parseFloat(document.getElementById('endLat').value);
         const eLng = parseFloat(document.getElementById('endLng').value);
-        const eLabel = document.getElementById('endLabel').value;
+        const t = themes[activeTheme];
 
         document.getElementById('ui-panel').style.opacity = '0';
         document.getElementById('ui-panel').style.pointerEvents = 'none';
         document.getElementById('tap-to-restore').style.display = 'block';
 
         world.pointOfView({ lat: sLat, lng: sLng, altitude: 0.4 }, 0);
-        updateMapData(sLat, sLng, sLabel, eLat, eLng, eLabel);
+        refreshMapData();
         
         setTimeout(() => {
             startRecording();
 
-            // THE FIX: Clean, solid arc. No dashes, just a crisp glowing beam.
+            // Draw theme-colored glowing beam
             world.arcsData([{
                 startLat: sLat, startLng: sLng, endLat: eLat, endLng: eLng,
-                color: ['#FFD700', '#FFD700']
+                color: [t.accentColor, t.accentColor]
             }])
             .arcColor('color')
             .arcStroke(1.5); 
+
+            // Calculate timing based on theme (Tactical is faster)
+            const phase1Time = 2500 * t.camSpeedMultiplier;
+            const phase2Time = 3000 * t.camSpeedMultiplier;
 
             setTimeout(() => {
                 const midLat = (sLat + eLat) / 2;
                 const midLng = (sLng + eLng) / 2;
                 
-                world.pointOfView({ lat: midLat, lng: midLng, altitude: 1.6 }, 2500); 
+                world.pointOfView({ lat: midLat, lng: midLng, altitude: 1.6 }, phase1Time); 
                 
                 setTimeout(() => {
-                    world.pointOfView({ lat: eLat, lng: eLng, altitude: 0.3 }, 3000); 
-                    setTimeout(() => mediaRecorder.stop(), 4500); 
-                }, 2500);
+                    world.pointOfView({ lat: eLat, lng: eLng, altitude: 0.3 }, phase2Time); 
+                    
+                    // Add a little padding at the end of the video before saving
+                    setTimeout(() => mediaRecorder.stop(), 1500); 
+                }, phase1Time);
             }, 800);
         }, 500);
     }
@@ -221,6 +286,9 @@
         document.getElementById('ui-panel').style.opacity = '1';
         document.getElementById('ui-panel').style.pointerEvents = 'auto';
         document.getElementById('tap-to-restore').style.display = 'none';
+        
+        // Remove the arc line when resetting so it's ready for the next recording
+        world.arcsData([]); 
     }
 </script>
 
