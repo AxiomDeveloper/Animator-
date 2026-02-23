@@ -3,150 +3,215 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Free Satellite Animator with Labels</title>
+    <title>16:9 Map Video Generator</title>
     <script src="https://unpkg.com/globe.gl"></script>
     <style>
-        body { margin: 0; padding: 0; background: #000; font-family: -apple-system, sans-serif; overflow: hidden; }
-        #globeViz { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        body { margin: 0; padding: 0; background: #050505; font-family: -apple-system, sans-serif; overflow: hidden; display: flex; align-items: center; justify-content: center; height: 100vh;}
         
-        /* Mobile-Friendly iPhone Controls */
-        #ui-panel {
-            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-            background: rgba(20, 20, 20, 0.85); padding: 15px; border-radius: 20px;
-            backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
-            color: white; display: flex; flex-direction: column; gap: 10px;
-            width: 90%; max-width: 400px; box-sizing: border-box; border: 1px solid rgba(255,255,255,0.1);
-            transition: opacity 0.4s ease; /* Smooth fade out */
+        /* 16:9 Locked Video Container */
+        #video-container {
+            position: relative;
+            width: 100vw;
+            aspect-ratio: 16 / 9;
+            max-height: 100vh;
+            background: #000;
+            overflow: hidden;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
         }
-        .row { display: flex; gap: 10px; }
+
+        #globeViz { width: 100%; height: 100%; }
+        
+        /* Sleek Broadcast Label UX */
+        .broadcast-label {
+            background: rgba(15, 15, 20, 0.85);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            color: white;
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            border-left: 4px solid #ff3b30;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            pointer-events: none;
+            transform: translate(-50%, -150%); /* Hover above the dot */
+            white-space: nowrap;
+        }
+
+        /* Upgraded Mobile UI Panel */
+        #ui-panel {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(20, 20, 20, 0.9); padding: 15px; border-radius: 16px;
+            backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+            color: white; display: flex; flex-direction: column; gap: 8px;
+            width: 90%; max-width: 500px; box-sizing: border-box; border: 1px solid rgba(255,255,255,0.15);
+            transition: opacity 0.4s ease; z-index: 20;
+        }
+        .row { display: flex; gap: 8px; }
         .input-group { display: flex; flex-direction: column; flex: 1; }
-        label { font-size: 10px; color: #aaa; margin-bottom: 4px; text-transform: uppercase; font-weight: bold; letter-spacing: 1px;}
+        label { font-size: 9px; color: #bbb; margin-bottom: 3px; text-transform: uppercase; font-weight: bold; letter-spacing: 1px;}
         input { 
-            background: rgba(0,0,0,0.6); border: 1px solid #555; color: white; 
-            padding: 8px; border-radius: 8px; font-size: 14px; width: 100%; box-sizing: border-box;
+            background: rgba(0,0,0,0.7); border: 1px solid #444; color: white; 
+            padding: 8px; border-radius: 6px; font-size: 13px; width: 100%; box-sizing: border-box;
         }
         button { 
-            background: #ff3b30; color: white; border: none; padding: 14px; 
-            border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 5px;
+            background: #ff3b30; color: white; border: none; padding: 12px; 
+            border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; margin-top: 5px;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
         }
         button:active { background: #cc2f26; }
-        .header { text-align: center; font-weight: bold; margin-bottom: 2px; font-size: 14px; color: #ddd;}
+        .header { text-align: center; font-weight: bold; margin-bottom: 0px; font-size: 12px; color: #ddd;}
         
-        /* Invisible overlay to tap and bring UI back */
-        #tap-to-restore {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 10; display: none;
+        #tap-to-restore { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; display: none; }
+        
+        /* Recording Indicator */
+        #recording-indicator {
+            position: absolute; top: 20px; right: 20px; color: #ff3b30; font-weight: bold;
+            font-size: 14px; display: none; align-items: center; gap: 6px; z-index: 30;
+            background: rgba(0,0,0,0.6); padding: 6px 12px; border-radius: 20px;
         }
+        .red-dot { width: 10px; height: 10px; background: #ff3b30; border-radius: 50%; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
 
-<div id="globeViz"></div>
-<div id="tap-to-restore" onclick="restoreUI()"></div>
+<div id="video-container">
+    <div id="globeViz"></div>
+    <div id="recording-indicator"><div class="red-dot"></div> REC</div>
+    <div id="tap-to-restore" onclick="restoreUI()"></div>
+</div>
 
 <div id="ui-panel">
-    <div class="header">Location 1 (Start)</div>
     <div class="row">
-        <div class="input-group"><label>Label Name</label><input type="text" id="startLabel" value="Iran"></div>
+        <div class="input-group"><label>Start Label</label><input type="text" id="startLabel" value="Iran"></div>
+        <div class="input-group"><label>Lat</label><input type="number" id="startLat" value="32.4279"></div>
+        <div class="input-group"><label>Lng</label><input type="number" id="startLng" value="53.6880"></div>
     </div>
     <div class="row">
-        <div class="input-group"><label>Latitude</label><input type="number" id="startLat" value="32.4279"></div>
-        <div class="input-group"><label>Longitude</label><input type="number" id="startLng" value="53.6880"></div>
+        <div class="input-group"><label>End Label</label><input type="text" id="endLabel" value="Diego Garcia Air Base"></div>
+        <div class="input-group"><label>Lat</label><input type="number" id="endLat" value="-7.3195"></div>
+        <div class="input-group"><label>Lng</label><input type="number" id="endLng" value="72.4149"></div>
     </div>
-
-    <div class="header" style="margin-top: 5px;">Location 2 (End)</div>
-    <div class="row">
-        <div class="input-group"><label>Label Name</label><input type="text" id="endLabel" value="Diego Garcia Air Base"></div>
-    </div>
-    <div class="row">
-        <div class="input-group"><label>Latitude</label><input type="number" id="endLat" value="-7.3195"></div>
-        <div class="input-group"><label>Longitude</label><input type="number" id="endLng" value="72.4149"></div>
-    </div>
-    
-    <button onclick="playAnimation()">Fly & Draw Path</button>
+    <button onclick="recordAndFly()">🔴 Record 16:9 Video & Fly</button>
 </div>
 
 <script>
-    // Initialize Globe
-    const world = Globe()
-        (document.getElementById('globeViz'))
+    // Initialize Globe inside the 16:9 container
+    const elem = document.getElementById('globeViz');
+    const world = Globe()(elem)
         .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg')
         .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
         .backgroundImageUrl('https://unpkg.com/three-globe/example/img/night-sky.png')
         .pointOfView({ lat: 32.4279, lng: 53.6880, altitude: 2.5 });
 
-    // Initial setup for markers and labels
-    function updateMapData(sLat, sLng, sLabel, eLat, eLng, eLabel) {
-        // Red Dots
-        world.pointsData([
-            { lat: sLat, lng: sLng },
-            { lat: eLat, lng: eLng }
-        ])
-        .pointColor(() => '#ff3b30')
-        .pointAltitude(0.02)
-        .pointRadius(0.3);
+    let mediaRecorder;
+    let recordedChunks = [];
 
-        // White Text Labels floating just above the dots
-        world.labelsData([
-            { lat: sLat, lng: sLng, text: sLabel },
-            { lat: eLat, lng: eLng, text: eLabel }
+    // Upgraded Graphic Labels
+    function updateMapData(sLat, sLng, sLabel, eLat, eLng, eLabel) {
+        world.pointsData([ { lat: sLat, lng: sLng }, { lat: eLat, lng: eLng } ])
+        .pointColor(() => '#ff3b30').pointAltitude(0.02).pointRadius(0.3);
+
+        // Using HTML Elements for High-End UX Labels
+        world.htmlElementsData([
+            { lat: sLat, lng: sLng, name: sLabel },
+            { lat: eLat, lng: eLng, name: eLabel }
         ])
-        .labelLat(d => d.lat)
-        .labelLng(d => d.lng)
-        .labelText(d => d.text)
-        .labelSize(1.5)
-        .labelDotRadius(0) // Hidden dot so we only see the red point underneath
-        .labelColor(() => '#ffffff')
-        .labelAltitude(0.04);
+        .htmlElement(d => {
+            const el = document.createElement('div');
+            el.innerHTML = d.name;
+            el.className = 'broadcast-label';
+            return el;
+        });
     }
 
-    // Load defaults on start
+    // Default setup
     updateMapData(32.4279, 53.6880, "Iran", -7.3195, 72.4149, "Diego Garcia Air Base");
 
-    function playAnimation() {
-        // Grab inputs
+    function startRecording() {
+        const canvas = elem.querySelector('canvas');
+        const stream = canvas.captureStream(60); // Capture at 60 FPS
+        
+        // High Quality Video Settings
+        const options = { mimeType: 'video/webm; codecs=vp9', videoBitsPerSecond: 8000000 };
+        mediaRecorder = new MediaRecorder(stream, options);
+        
+        mediaRecorder.ondataavailable = handleDataAvailable;
+        mediaRecorder.onstop = handleStop;
+        mediaRecorder.start();
+        
+        document.getElementById('recording-indicator').style.display = 'flex';
+    }
+
+    function handleDataAvailable(event) {
+        if (event.data.size > 0) {
+            recordedChunks.push(event.data);
+        }
+    }
+
+    function handleStop() {
+        // Create and download the video file
+        const blob = new Blob(recordedChunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = 'Map_Animation_16x9.webm';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { document.body.removeChild(a); window.URL.revokeObjectURL(url); }, 100);
+        
+        recordedChunks = [];
+        document.getElementById('recording-indicator').style.display = 'none';
+        restoreUI();
+    }
+
+    function recordAndFly() {
         const sLat = parseFloat(document.getElementById('startLat').value);
         const sLng = parseFloat(document.getElementById('startLng').value);
         const sLabel = document.getElementById('startLabel').value;
-        
         const eLat = parseFloat(document.getElementById('endLat').value);
         const eLng = parseFloat(document.getElementById('endLng').value);
         const eLabel = document.getElementById('endLabel').value;
 
-        // Hide UI for screen recording
+        // Hide UI
         document.getElementById('ui-panel').style.opacity = '0';
         document.getElementById('ui-panel').style.pointerEvents = 'none';
         document.getElementById('tap-to-restore').style.display = 'block';
 
-        // Snap camera back to start
+        // Reset View and Start Recording
         world.pointOfView({ lat: sLat, lng: sLng, altitude: 2.0 }, 0);
         updateMapData(sLat, sLng, sLabel, eLat, eLng, eLabel);
-
-        // Draw animated arc
-        world.arcsData([{
-            startLat: sLat, startLng: sLng, endLat: eLat, endLng: eLng,
-            color: ['rgba(255, 59, 48, 0.1)', '#ff3b30']
-        }])
-        .arcColor('color')
-        .arcDashLength(0.6)
-        .arcDashGap(0.2)
-        .arcDashAnimateTime(2000)
-        .arcStroke(1.2);
-
-        // Cinematic Camera Flight
+        
+        // Give the map a moment to render before hitting record
         setTimeout(() => {
-            const midLat = (sLat + eLat) / 2;
-            const midLng = (sLng + eLng) / 2;
-            
-            // Pan to midpoint and zoom out
-            world.pointOfView({ lat: midLat, lng: midLng, altitude: 3.0 }, 2500);
-            
-            // Zoom in on destination
+            startRecording();
+
+            // Draw glowing path
+            world.arcsData([{
+                startLat: sLat, startLng: sLng, endLat: eLat, endLng: eLng,
+                color: ['rgba(255, 59, 48, 0.1)', '#ff3b30']
+            }])
+            .arcColor('color').arcDashLength(0.6).arcDashGap(0.2).arcDashAnimateTime(2000).arcStroke(1.2);
+
+            // Cinematic Camera Timeline
             setTimeout(() => {
-                world.pointOfView({ lat: eLat, lng: eLng, altitude: 1.5 }, 2500);
-            }, 2500);
-            
-        }, 800);
+                const midLat = (sLat + eLat) / 2;
+                const midLng = (sLng + eLng) / 2;
+                world.pointOfView({ lat: midLat, lng: midLng, altitude: 3.0 }, 2500); // Zoom out
+                
+                setTimeout(() => {
+                    world.pointOfView({ lat: eLat, lng: eLng, altitude: 1.5 }, 2500); // Zoom in
+                    
+                    // Stop recording 1.5 seconds after the camera lands
+                    setTimeout(() => {
+                        mediaRecorder.stop();
+                    }, 4000); 
+                }, 2500);
+            }, 800);
+        }, 500);
     }
 
     function restoreUI() {
