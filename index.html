@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>16:9 Precision Map Video Generator</title>
+    <title>Pro Broadcast Map Renderer</title>
     <script src="https://unpkg.com/globe.gl"></script>
     <style>
         body { 
@@ -40,30 +40,39 @@
         
         #tap-to-restore { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; display: none; }
         
-        #recording-indicator {
-            position: absolute; top: 20px; right: 20px; color: #ff3b30; font-weight: bold;
-            font-size: 14px; display: none; align-items: center; gap: 6px; z-index: 30;
-            background: rgba(0,0,0,0.8); padding: 6px 12px; border-radius: 20px; border: 1px solid #ff3b30;
+        /* Pro Render Indicator */
+        #rendering-overlay {
+            position: absolute; top: 20px; right: 20px; color: #fff; font-weight: bold;
+            font-size: 12px; display: none; align-items: center; gap: 8px; z-index: 30;
+            background: rgba(255, 59, 48, 0.9); padding: 6px 14px; border-radius: 20px; letter-spacing: 1px;
+            box-shadow: 0 4px 15px rgba(255, 59, 48, 0.4);
         }
-        .red-dot { width: 10px; height: 10px; background: #ff3b30; border-radius: 50%; animation: pulse-red 1s infinite; }
-        @keyframes pulse-red { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+        .spinner { width: 12px; height: 12px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
 <div id="video-container">
     <div id="globeViz"></div>
-    <div id="recording-indicator"><div class="red-dot"></div> REC</div>
+    <div id="rendering-overlay"><div class="spinner"></div> RENDERING</div>
     <div id="tap-to-restore" onclick="restoreUI()"></div>
 </div>
 
 <div id="ui-panel">
     <div class="row">
         <div class="input-group">
-            <label>Visual Style</label>
+            <label>Style</label>
             <select id="themeSelector" onchange="applyTheme()">
-                <option value="broadcast">News Broadcast (Yellow Path / Blue Earth)</option>
-                <option value="tactical">Clean Military (Red Path / Dark Earth)</option>
+                <option value="broadcast">News Broadcast (Blue Earth)</option>
+                <option value="tactical">Clean Military (Dark Earth)</option>
+            </select>
+        </div>
+        <div class="input-group">
+            <label>Output Quality</label>
+            <select id="qualitySelector">
+                <option value="1080">1080p HD (Broadcast)</option>
+                <option value="720">720p (Max Smoothness)</option>
             </select>
         </div>
     </div>
@@ -77,7 +86,7 @@
         <div class="input-group"><label>Lat</label><input type="number" id="endLat" value="-7.3195" step="any"></div>
         <div class="input-group"><label>Lng</label><input type="number" id="endLng" value="72.4149" step="any"></div>
     </div>
-    <button id="recordBtn" onclick="recordAndFly()">🔴 Record MP4 & Fly</button>
+    <button id="recordBtn" onclick="recordAndFly()">RENDER MP4 VIDEO</button>
 </div>
 
 <script>
@@ -89,20 +98,14 @@
         broadcast: {
             globeImg: 'https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg',
             bgImg: 'https://unpkg.com/three-globe/example/img/night-sky.png',
-            accentColor: '#FFD700', 
-            textColor: '#FFFFFF', 
-            camSpeedMultiplier: 1.0, 
-            btnColor: '#FFD700',
-            btnText: '#000'
+            accentColor: '#FFD700', textColor: '#FFFFFF', camSpeedMultiplier: 1.0, 
+            btnColor: '#FFD700', btnText: '#000'
         },
         tactical: {
             globeImg: 'https://unpkg.com/three-globe/example/img/earth-dark.jpg',
             bgImg: null, 
-            accentColor: '#FF3B30', 
-            textColor: '#FFFFFF', 
-            camSpeedMultiplier: 0.7, 
-            btnColor: '#FF3B30',
-            btnText: '#FFF'
+            accentColor: '#FF3B30', textColor: '#FFFFFF', camSpeedMultiplier: 0.8, 
+            btnColor: '#FF3B30', btnText: '#FFF'
         }
     };
 
@@ -153,32 +156,20 @@
         
         const t = themes[activeTheme];
 
-        // 1. Clean, Solid Dots for the Target Location
+        // Clean Solid Dots
         world.pointsData([
             { lat: sLat, lng: sLng },
             { lat: eLat, lng: eLng }
         ])
-        .pointColor(() => t.accentColor)
-        .pointAltitude(0.01)
-        .pointRadius(0.3);
+        .pointColor(() => t.accentColor).pointAltitude(0.01).pointRadius(0.3);
 
-        // 2. 3D Text shifted to the RIGHT (Longitude + 1.5) so it doesn't overlap the dot
+        // Labels shifted perfectly to the right
         world.labelsData([
             { lat: sLat, lng: sLng + 1.5, text: sLabel },
             { lat: eLat, lng: eLng + 1.5, text: eLabel }
         ])
-        .labelLat('lat')
-        .labelLng('lng')
-        .labelText('text')
-        .labelSize(0.8) 
-        .labelDotRadius(0) // Keep native dot hidden so we only see the clean point above
-        .labelColor(() => t.textColor)
-        .labelResolution(8)
-        .labelAltitude(0.01);
-        
-        // Emptied the old crosshair/ring arrays to keep it clean
-        world.pathsData([]);
-        world.ringsData([]);
+        .labelLat('lat').labelLng('lng').labelText('text').labelSize(0.8) 
+        .labelDotRadius(0).labelColor(() => t.textColor).labelResolution(8).labelAltitude(0.01);
     }
 
     applyTheme();
@@ -186,22 +177,29 @@
     function startRecording() {
         const glCanvas = elem.querySelector('canvas');
         
-        // 2D Mirroring to bypass Safari's WebGL freeze bug
+        // --- PRO RENDER PIPELINE OPTIMIZER ---
+        // Force the video into exact broadcast standards instead of raw Retina screen resolution
+        const quality = parseInt(document.getElementById('qualitySelector').value);
+        const targetWidth = quality === 1080 ? 1920 : 1280;
+        const targetHeight = quality === 1080 ? 1080 : 720;
+        const targetFPS = 30; // 30fps guarantees the mobile CPU won't drop frames
+        
         const recordCanvas = document.createElement('canvas');
-        recordCanvas.width = glCanvas.width;
-        recordCanvas.height = glCanvas.height;
+        recordCanvas.width = targetWidth;
+        recordCanvas.height = targetHeight;
         const ctx = recordCanvas.getContext('2d');
         
         isRecording = true;
         
+        // This scales the high-res 3D map cleanly into a 1080p/720p frame
         function renderLoop() {
             if (!isRecording) return;
-            ctx.drawImage(glCanvas, 0, 0);
+            ctx.drawImage(glCanvas, 0, 0, targetWidth, targetHeight);
             requestAnimationFrame(renderLoop);
         }
         requestAnimationFrame(renderLoop);
 
-        const stream = recordCanvas.captureStream(60); 
+        const stream = recordCanvas.captureStream(targetFPS); 
 
         let selectedMimeType = 'video/mp4'; 
         if (MediaRecorder.isTypeSupported('video/mp4; codecs="avc1.42E01E"')) {
@@ -210,7 +208,8 @@
             selectedMimeType = 'video/webm; codecs=vp9'; 
         }
 
-        mediaRecorder = new MediaRecorder(stream, { mimeType: selectedMimeType, videoBitsPerSecond: 8000000 });
+        // Generous 12 Mbps bitrate for artifact-free rendering
+        mediaRecorder = new MediaRecorder(stream, { mimeType: selectedMimeType, videoBitsPerSecond: 12000000 });
         mediaRecorder.ondataavailable = (event) => { if (event.data.size > 0) recordedChunks.push(event.data); };
         
         mediaRecorder.onstop = () => {
@@ -221,18 +220,18 @@
             const a = document.createElement('a');
             a.style.display = 'none';
             a.href = url;
-            a.download = `Map_${activeTheme.toUpperCase()}_16x9.mp4`; 
+            a.download = `Map_${activeTheme.toUpperCase()}_${quality}p.mp4`; 
             document.body.appendChild(a);
             a.click();
             setTimeout(() => { document.body.removeChild(a); window.URL.revokeObjectURL(url); }, 100);
             
             recordedChunks = [];
-            document.getElementById('recording-indicator').style.display = 'none';
+            document.getElementById('rendering-overlay').style.display = 'none';
             restoreUI();
         };
 
         mediaRecorder.start(100); 
-        document.getElementById('recording-indicator').style.display = 'flex';
+        document.getElementById('rendering-overlay').style.display = 'flex';
     }
 
     function recordAndFly() {
@@ -249,6 +248,7 @@
         world.pointOfView({ lat: sLat, lng: sLng, altitude: 0.4 }, 0);
         refreshMapData();
         
+        // Wait a half second for the map to stabilize before encoding starts
         setTimeout(() => {
             startRecording();
 
@@ -271,7 +271,7 @@
                 setTimeout(() => {
                     world.pointOfView({ lat: eLat, lng: eLng, altitude: 0.3 }, phase2Time); 
                     
-                    // Guaranteed 3.0 second dead-stop hold before saving
+                    // Dead-stop hold for 3 seconds before ending the video
                     setTimeout(() => mediaRecorder.stop(), phase2Time + 3000); 
                 }, phase1Time);
             }, 800);
