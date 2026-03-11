@@ -28,6 +28,11 @@
         label { font-size: 9px; color: #888; margin-bottom: 3px; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px;}
         input, select { background: #000; border: 1px solid #333; color: white; padding: 8px; border-radius: 6px; font-size: 13px; width: 100%; box-sizing: border-box; }
         button { border: none; padding: 12px; border-radius: 8px; font-size: 15px; font-weight: 900; cursor: pointer; margin-top: 5px; transition: background 0.2s;}
+        .secondary-btn { background: #1d1d1d; color: #d7d7d7; border: 1px solid #444; }
+        .secondary-btn:hover { background: #2a2a2a; }
+        .prompt-block { background: rgba(0,0,0,0.4); border: 1px solid #2f2f2f; border-radius: 8px; padding: 10px; }
+        .prompt-block p { margin: 0; color: #d0d0d0; font-size: 12px; line-height: 1.45; white-space: pre-line; }
+        .prompt-title { font-size: 10px; color: #888; margin-bottom: 6px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.6px; }
         
         .toggle-row { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.5); padding: 8px 12px; border-radius: 6px; border: 1px solid #333; }
         .toggle-row label { margin: 0; font-size: 11px; color: #ccc;}
@@ -104,6 +109,12 @@
     </div>
 
     <button id="recordBtn" onclick="recordAndFly()">RENDER UNIVERSAL MP4</button>
+    <button class="secondary-btn" onclick="copyViralReelPrompt()">COPY UK MILITARY REEL PROMPT</button>
+
+    <div class="prompt-block">
+        <div class="prompt-title">Viral Reel Prompt Pack</div>
+        <p id="viralReelPromptPreview"></p>
+    </div>
 </div>
 
 <script>
@@ -127,6 +138,22 @@
 
     let muxer, videoEncoder, frameCount = 0, isRecording = false, lastCaptureTime = 0;
     const TARGET_FPS = 30;
+    const viralReelPromptPack = {
+        masterPrompt: 'Cinematic vertical military edit (9:16). Royal Navy Type 45 destroyer HMS Dragon cutting through rough ocean at sunrise, Welsh dragon emblem on the bow. Dramatic slow-motion water spray. Cut to RAF Typhoon fighter jets roaring through clouds at Mach speed, afterburners glowing orange. Massive bass-drop transitions with fast cuts. Royal Navy Wildcat helicopter launching from the deck of HMS Dragon. Close-up of Sea Viper missile launching from the destroyer with smoke trails. British F-35B stealth jet taking off from aircraft carrier deck at night with glowing runway lights. Cinematic drone shots of British soldiers and warships. Dark cinematic color grading, teal-orange military style. Fast-paced brainrot style editing like viral war edits on social media. Epic dramatic lighting, film grain, motion blur, slow motion explosions in distance. Patriotic atmosphere, British flag patches, stormy sky. Ultra realistic, IMAX cinematic look, 4k detail, dramatic contrast.',
+        reelStructure: [
+            '0-2s | Bass rise | HMS Dragon cutting waves | Text: "THE UNITED KINGDOM"',
+            '2-5s | Jets screaming overhead | Text: "WHEN THE WORLD BURNS…"',
+            '5-8s | Missile launch / warship weapons | Text: "…BRITAIN RESPONDS."',
+            '8-12s | Typhoon flyby / F-35 takeoff | Text: "ROYAL NAVY | RAF"',
+            '12-15s | Huge bass drop + warship/jets montage | Text: "RULE THE WAVES 🇬🇧"'
+        ],
+        music: [
+            'After Dark x Sweater Weather phonk remix',
+            'Metamorphosis — Interworld',
+            'Memory Reboot — VØJ & Narvent',
+            'Hard phonk / trap military edits'
+        ]
+    };
 
     function resizeMap() { 
         if(isRecording) return; 
@@ -159,6 +186,26 @@
         const btn = document.getElementById('recordBtn'); btn.style.background = t.btnColor; btn.style.color = t.btnText;
         refreshMapData();
     }
+
+    function formatViralPromptPreview() {
+        const structure = viralReelPromptPack.reelStructure.map(item => `• ${item}`).join('\n');
+        const music = viralReelPromptPack.music.map(item => `• ${item}`).join('\n');
+        return `MASTER PROMPT\n${viralReelPromptPack.masterPrompt}\n\nREEL STRUCTURE (15–20s)\n${structure}\n\nMUSIC OPTIONS\n${music}`;
+    }
+
+    function copyViralReelPrompt() {
+        const packedPrompt = formatViralPromptPreview();
+        navigator.clipboard.writeText(packedPrompt)
+            .then(() => {
+                const copyBtn = document.querySelector('.secondary-btn');
+                const originalLabel = copyBtn.textContent;
+                copyBtn.textContent = 'PROMPT COPIED';
+                setTimeout(() => { copyBtn.textContent = originalLabel; }, 1500);
+            })
+            .catch(() => alert('Unable to access clipboard in this browser session.'));
+    }
+
+    document.getElementById('viralReelPromptPreview').textContent = formatViralPromptPreview();
 
     function refreshMapData() {
         const sLat = parseFloat(document.getElementById('startLat').value); const sLng = parseFloat(document.getElementById('startLng').value); const sLabel = document.getElementById('startLabel').value;
